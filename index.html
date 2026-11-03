@@ -2930,6 +2930,78 @@
         ctx.lineCap = 'butt';
       }
 
+      // --- Deep space layers: all pre-rendered once, so each frame is just a few image draws ---
+      // Deep-field dust: hundreds of faint pin-prick stars far behind the constellation, drifting very slowly
+      let dust = null, galaxy = null, spaceKey = '';
+      function buildDust() {
+        const dpr = canvas.width / w || 1;
+        const c = document.createElement('canvas');
+        c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+        const g = c.getContext('2d');
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const n = Math.min(finePointer ? 900 : 380, Math.round(w * h / 2400));
+        for (let i = 0; i < n; i++) {
+          const r = Math.random();
+          g.fillStyle = `rgba(${r < .12 ? P.glow : P.dot}, ${(.08 + Math.pow(Math.random(), 2) * .4).toFixed(3)})`;
+          g.beginPath(); g.arc(Math.random() * w, Math.random() * h, .3 + r * r * .7, 0, Math.PI * 2); g.fill();
+        }
+        return c;
+      }
+      // A distant spiral galaxy: soft core + two arms of tiny stars, seen at an angle
+      function buildGalaxy() {
+        const S = 360, R = S / 2, c = document.createElement('canvas');
+        c.width = c.height = S;
+        const g = c.getContext('2d');
+        const core = g.createRadialGradient(R, R, 0, R, R, R * .42);
+        core.addColorStop(0, `rgba(${P.head}, .55)`);
+        core.addColorStop(.18, `rgba(${P.glow}, .18)`);
+        core.addColorStop(1, `rgba(${P.glow}, 0)`);
+        g.fillStyle = core; g.fillRect(0, 0, S, S);
+        for (let i = 0; i < 1600; i++) {
+          const t = Math.random(), r = Math.pow(t, .75) * R * .94;
+          const a = (i & 1) * Math.PI + t * 4.4 + (Math.random() - .5) * (.9 - t * .5);
+          const x = R + Math.cos(a) * r + (Math.random() - .5) * 6, y = R + Math.sin(a) * r + (Math.random() - .5) * 6;
+          g.fillStyle = `rgba(${Math.random() < .35 ? P.glow : P.dot}, ${((1 - t) * .45 + .06).toFixed(3)})`;
+          g.beginPath(); g.arc(x, y, .4 + Math.random() * .8, 0, Math.PI * 2); g.fill();
+        }
+        return c;
+      }
+      function drawSpace(now, sy, light) {
+        const key = `${w}x${h}|${light}`;
+        if (key !== spaceKey) { spaceKey = key; dust = buildDust(); galaxy = buildGalaxy(); }
+        // Dust: a slow sideways drift plus a gentle scroll parallax, tiled so it wraps seamlessly
+        const ox = (now * .004 * DRIFT) % w, oy = ((-sy * .06) % h + h) % h;
+        for (const x of [-ox, w - ox]) for (const y of [oy - h, oy]) ctx.drawImage(dust, x, y, w, h);
+        // Galaxy: in the open sky between the headline and the photo, tilted, turning once every ~8 minutes
+        const size = Math.min(w, h) * (finePointer ? .42 : .55);
+        ctx.save();
+        ctx.globalAlpha = light ? .35 : .6;
+        ctx.translate(w * (finePointer ? .5 : .72), h * (finePointer ? .16 : .12) - Math.min(sy * .04, h * .12));
+        ctx.rotate(-.45);
+        ctx.scale(1, .38);
+        ctx.rotate(now * .000013 * DRIFT);
+        ctx.drawImage(galaxy, -size / 2, -size / 2, size, size);
+        ctx.restore();
+      }
+      // A satellite now and then: a faint dot crossing slowly with a navigation-light blink
+      let sat = null, nextSat = performance.now() + 9000;
+      function satStep(now, k) {
+        if (!sat && now > nextSat) {
+          const ltr = Math.random() < .5;
+          sat = { x: ltr ? -10 : w + 10, y: h * (.08 + Math.random() * .32), vx: (ltr ? 1 : -1) * (.35 + Math.random() * .2), vy: (Math.random() - .5) * .1 };
+        }
+        if (!sat) return;
+        sat.x += sat.vx * k; sat.y += sat.vy * k;
+        const fade = Math.max(0, Math.min(1, Math.min(sat.x + 10, w + 10 - sat.x) / 140));
+        ctx.fillStyle = `rgba(${P.dot}, ${(.6 * fade).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(sat.x, sat.y, 1.1, 0, Math.PI * 2); ctx.fill();
+        if (now % 1800 < 140) {
+          ctx.fillStyle = `rgba(${P.head}, ${(.75 * fade).toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(sat.x, sat.y, 2.1, 0, Math.PI * 2); ctx.fill();
+        }
+        if (sat.x < -12 || sat.x > w + 12) { sat = null; nextSat = now + 18000 + Math.random() * 22000; }
+      }
+
       let lastT = 0;
       function frame(move) {
         ctx.clearRect(0, 0, w, h);
@@ -2938,7 +3010,9 @@
         const k = lastT ? Math.min(Math.max((now - lastT) / 16.67, 0), 3) : 1;
         lastT = now;
         // Colours follow the theme: pale mint on dark, deep green on light
-        P = document.documentElement.getAttribute('data-theme') === 'light' ? PAL.light : PAL.dark;
+        const light = document.documentElement.getAttribute('data-theme') === 'light';
+        P = light ? PAL.light : PAL.dark;
+        drawSpace(now, sy, light);   // deep layers first, the constellation draws on top
         // Lite mode draws half the stars (and far fewer links)
         const count = document.documentElement.classList.contains('lite') ? pts.length >> 1 : pts.length;
         for (const p of pts) {
@@ -2976,7 +3050,7 @@
             ctx.beginPath(); ctx.arc(a.sx, a.sy, 5, 0, Math.PI * 2); ctx.fill();
           }
         }
-        if (move && !reduceMotion) meteorsStep(now, k);   // no shooting stars with reduce motion, the drift keeps going
+        if (move && !reduceMotion) { meteorsStep(now, k); satStep(now, k); }   // no shooting stars with reduce motion, the drift keeps going
       }
       resize();
       canvas.classList.add('ready');
