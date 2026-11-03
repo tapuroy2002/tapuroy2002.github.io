@@ -1396,8 +1396,7 @@
       .f-head { flex-direction: column; gap: 2px; }
     }
 
-    /* The stars are composited by the GPU layer, so the separate star canvas stays hidden */
-    .bg-fx.gl #bg-canvas { visibility: hidden; }
+    /* The star canvas sits above the shader canvas and the browser composites the two (no per-frame GPU upload) */
 
     /* The background stays live even with "reduce motion": same drift, at a calmer pace */
     @media (prefers-reduced-motion: reduce) {
@@ -2680,7 +2679,6 @@
     //   Pass 2: full screen resolution. Combines that texture with the star layer; the cards above it are CSS frosted glass.
     (() => {
       const canvas = document.getElementById('bg-gl');
-      const starsCanvas = document.getElementById('bg-canvas');
       const gl = canvas.getContext('webgl', { antialias: false, alpha: false, premultipliedAlpha: false });
       if (!gl) return;   // no WebGL: the CSS aurora + frosted glass stay as the fallback
 
@@ -2825,7 +2823,7 @@
       function render(now) {
         if (!ready) return;
         if (isLite() !== wasLite) { wasLite = isLite(); resize(); }       // lite only lowers the cost, never stops it
-        if (isLite() && now - lastDraw < 32) return;                     // ~30 fps in lite mode
+        if (isLite() && now - lastDraw < 26) return;                     // ~30 fps in lite mode (tolerant of rAF jitter, so it never dips to 20)
         const dt = Math.max(0, Math.min(now - lastNow, 100));
         lastNow = now; lastDraw = now;
         clock += dt * SPEED;
@@ -2846,18 +2844,11 @@
         gl.uniform1f(us.s, sCur); gl.uniform1f(us.L, lCur);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-        // Stars: upload the 2D star canvas so they bend through the glass too
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, starsTex);
-        let starsOn = 0;
-        if (starsCanvas.width > 1) {
-          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, starsCanvas);
-          starsOn = 1;
-        }
+        // Stars are not uploaded here any more: re-uploading a full-screen canvas every frame was the main source of stutter.
+        // The star canvas is layered above this one by the browser compositor instead.
+        const starsOn = 0;
 
-        // Pass 2: screen, with glass
+        // Pass 2: screen
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.useProgram(P.comp.p);
@@ -2872,7 +2863,7 @@
 
       ready = setup();
       if (!ready) return;
-      bgFx.classList.add('gl');               // hides the CSS aurora and the separate star canvas (stars are drawn here now)
+      bgFx.classList.add('gl');               // hides the CSS aurora
       canvas.classList.add('ready');
       Frame.add(render, 2);                   // after smooth scroll (0) and the star layer (1), so everything lines up
       canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); ready = false; });
@@ -2899,8 +2890,7 @@
         }));
       }
       function resize() {
-        // 1x when the GPU layer composites the stars (they're uploaded every frame); otherwise sharper
-        const dpr = bgFx.classList.contains('gl') ? 1 : Math.min(devicePixelRatio || 1, 1.5);
+        const dpr = Math.min(devicePixelRatio || 1, document.documentElement.classList.contains('lite') ? 1 : 1.5);
         const widthChanged = innerWidth !== w;
         w = innerWidth; h = innerHeight;
         canvas.width = w * dpr; canvas.height = h * dpr;
@@ -2915,7 +2905,7 @@
       // Shooting stars every few seconds
       const meteors = [];
       let nextMeteor = performance.now() + 2500;
-      function meteorsStep(now) {
+      function meteorsStep(now, k) {
         if (now > nextMeteor) {
           const ang = (150 + Math.random() * 20) * Math.PI / 180, speed = 9 + Math.random() * 5;
           meteors.push({ x: w * (.35 + Math.random() * .75), y: -40 + Math.random() * h * .35,
@@ -2924,7 +2914,7 @@
         }
         for (let i = meteors.length - 1; i >= 0; i--) {
           const m = meteors[i];
-          m.x += m.vx; m.y += m.vy; m.life++;
+          m.x += m.vx * k; m.y += m.vy * k; m.life += k;
           const fade = Math.sin(Math.PI * Math.min(1, m.life / m.max));   // fade in, then out
           const tailX = m.x - m.vx * 12, tailY = m.y - m.vy * 12;
           const g = ctx.createLinearGradient(m.x, m.y, tailX, tailY);
@@ -2940,23 +2930,27 @@
         ctx.lineCap = 'butt';
       }
 
+      let lastT = 0;
       function frame(move) {
         ctx.clearRect(0, 0, w, h);
         const sy = scrollY, now = performance.now();
+        // Motion is scaled by elapsed time (k = 1 at 60 fps): same speed on 60/120/144 Hz, no lurch after a dropped frame
+        const k = lastT ? Math.min(Math.max((now - lastT) / 16.67, 0), 3) : 1;
+        lastT = now;
         // Colours follow the theme: pale mint on dark, deep green on light
         P = document.documentElement.getAttribute('data-theme') === 'light' ? PAL.light : PAL.dark;
         // Lite mode draws half the stars (and far fewer links)
         const count = document.documentElement.classList.contains('lite') ? pts.length >> 1 : pts.length;
         for (const p of pts) {
           if (move) {
-            p.x += p.vx * DRIFT; p.y += p.vy * DRIFT;
+            p.x += p.vx * DRIFT * k; p.y += p.vy * DRIFT * k;
             if (p.x < -20) p.x = w + 20; else if (p.x > w + 20) p.x = -20;
           }
           p.sx = p.x;
           p.sy = (((p.y - sy * p.z * .25) % h) + h) % h;
           // Gentle pull toward the cursor
           const dx = mouse.x - p.sx, dy = mouse.y - p.sy, d = Math.hypot(dx, dy);
-          if (move && d < MOUSE_LINK && d > 1) { p.x += dx / d * .18 * p.z; p.y += dy / d * .18 * p.z; }
+          if (move && d < MOUSE_LINK && d > 1) { p.x += dx / d * .18 * p.z * k; p.y += dy / d * .18 * p.z * k; }
         }
         ctx.lineWidth = 1;
         for (let i = 0; i < count; i++) {
@@ -2982,7 +2976,7 @@
             ctx.beginPath(); ctx.arc(a.sx, a.sy, 5, 0, Math.PI * 2); ctx.fill();
           }
         }
-        if (move && !reduceMotion) meteorsStep(now);   // no shooting stars with reduce motion, the drift keeps going
+        if (move && !reduceMotion) meteorsStep(now, k);   // no shooting stars with reduce motion, the drift keeps going
       }
       resize();
       canvas.classList.add('ready');
