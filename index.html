@@ -1684,6 +1684,16 @@
       [data-theme="light"] .drawer-label { border-bottom-color: rgba(10, 70, 70, .1); }
     }
 
+    /* "More apps": the date sits above the title as a small label, so titles get the full card width */
+    .mini-head { flex-direction: column-reverse; align-items: flex-start; gap: 4px; }
+    .mini-head span { font-family: var(--mono); font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--cyan); opacity: .85; }
+    .mini .tags { margin-top: auto; padding-top: 4px; }
+
+    /* Quick facts: rows stretch to match the About card, but not into big empty gaps on narrower desktops */
+    @media (min-width: 901px) { .facts .fact { max-height: 124px; } }
+    /* Timeline: keep "Jan 2025 – Present" on one line when the date rail narrows */
+    @media (min-width: 761px) and (max-width: 1100px) { .xp-date { font-size: .98rem; white-space: nowrap; } }
+
     /* ===== Small phones ===== */
     @media (max-width: 560px) {
       /* Project filter tabs share one row instead of spilling "AI" onto a second line */
