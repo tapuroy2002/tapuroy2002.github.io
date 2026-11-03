@@ -1122,7 +1122,10 @@
     ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 
     /* Back-to-top steps aside over the contact form on phones */
-    @media (max-width: 760px) { .to-top.tucked { opacity: 0; transform: translateY(16px); pointer-events: none; } }
+    @media (max-width: 760px) {
+      .to-top { width: 42px; height: 42px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); }
+      .to-top.tucked, .to-top.reading { opacity: 0; transform: translateY(16px); pointer-events: none; }
+    }
 
     /* ===== Lite mode (low-power devices): no backdrop blur, more solid glass, CSS aurora instead of the shader ===== */
     .lite { --glass-fill: rgba(36, 40, 48, .9); --glass-fill-deep: rgba(24, 27, 32, .8); }
@@ -1679,6 +1682,24 @@
       [data-theme="light"] .nav-scrim { background: rgba(10, 30, 30, .35); }
       [data-theme="light"] .nav-links li:not(.mobile-only) a.active { background: rgba(8, 145, 178, .08); }
       [data-theme="light"] .drawer-label { border-bottom-color: rgba(10, 70, 70, .1); }
+    }
+
+    /* ===== Small phones ===== */
+    @media (max-width: 560px) {
+      /* Project filter tabs share one row instead of spilling "AI" onto a second line */
+      .filters { display: flex; flex-wrap: nowrap; width: 100%; }
+      .filter { flex: 1 1 0; min-width: 0; padding: 8px 4px; white-space: nowrap; }
+    }
+    @media (max-width: 520px) {
+      /* About card: name gets the full row, the location pill sits underneath it */
+      .me-txt { flex-basis: calc(100% - 74px); }
+      .me-loc { margin-left: 74px; }
+    }
+    @media (max-width: 420px) {
+      /* Contact tiles: tighter so the email / GitHub handle fits without breaking mid-word */
+      .c-tile { gap: 10px; padding: 12px; }
+      .c-ic { width: 38px; height: 38px; border-radius: 10px; }
+      .c-link { font-size: .9rem; }
     }
   </style>
 </head>
@@ -2900,6 +2921,7 @@
       else if (y < lastY - 6 || y <= 320) header.classList.remove('hide');
       lastY = y;
       toTop.classList.toggle('show', y > 600);
+      toTop.classList.toggle('reading', header.classList.contains('hide'));   // phones: steps aside while reading downwards
       timeline.style.setProperty('--tl', t);
       // Light each dot once the line has reached it
       tlItems.forEach((item, i) => {
