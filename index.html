@@ -751,8 +751,8 @@
       --glass-fill: rgba(30, 34, 41, .64);
       --glass-fill-deep: rgba(255, 255, 255, .035);          /* tiles inside a card: a faint lift, not a hole */
       --glass-sheen: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,0) 30%);
-      --glass-blur: blur(28px) saturate(140%);
-      --glass-blur-sm: blur(18px) saturate(140%);
+      --glass-blur: blur(16px) saturate(140%);      /* the background is already soft, so a lighter blur looks the same and costs far less GPU */
+      --glass-blur-sm: blur(10px) saturate(130%);
       --raised: 0 24px 48px -28px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.075);
       --raised-sm: 0 10px 24px -16px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05), inset 0 0 0 1px rgba(255,255,255,.07);
       --inset: inset 0 0 0 1px rgba(255,255,255,.06);
@@ -778,6 +778,8 @@
       -webkit-backdrop-filter: var(--glass-blur-sm); backdrop-filter: var(--glass-blur-sm);
     }
     .tag { background: rgba(43, 255, 136, .07); box-shadow: inset 0 0 0 1px rgba(43, 255, 136, .14); }
+    /* Tags and copy buttons sit on cards that are already frosted: a second blur inside a blur costs GPU and shows nothing */
+    .tag, .copy-btn { -webkit-backdrop-filter: none; backdrop-filter: none; }
     .stat, .fact .icon-wrap, .skill .icon, .contact-line .icon, .tl-meta { background: var(--glass-fill-deep); }
 
     /* Primary button: liquid emerald with a glossy top edge */
@@ -790,7 +792,7 @@
     .btn-primary.sent { background: var(--green); }
 
     /* Header: a sheet of glass floating over the page */
-    header { background: rgba(30, 34, 41, .55); -webkit-backdrop-filter: blur(28px) saturate(140%); backdrop-filter: blur(28px) saturate(140%); border-bottom: 1px solid rgba(255,255,255,.06); box-shadow: none; }
+    header { background: rgba(30, 34, 41, .55); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); border-bottom: 1px solid rgba(255,255,255,.06); box-shadow: none; }
     header.scrolled { background: rgba(28, 31, 38, .7); box-shadow: 0 12px 32px -20px rgba(0,0,0,.7); }
     /* Active nav link sits in a glass lens */
     .nav-pill { background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
@@ -800,7 +802,7 @@
     input:focus, textarea:focus { background-color: rgba(255, 255, 255, .05); }
 
     /* Glass strip, toast */
-    .marquee { background: rgba(26, 29, 35, .45); -webkit-backdrop-filter: blur(12px) saturate(150%); backdrop-filter: blur(12px) saturate(150%); }
+    .marquee { background: rgba(26, 29, 35, .45); -webkit-backdrop-filter: blur(8px) saturate(150%); backdrop-filter: blur(8px) saturate(150%); }
     .toast { background: rgba(26, 29, 35, .7); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
     .social::after { background: rgba(26, 29, 35, .75); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 
@@ -896,11 +898,16 @@
     .mock {
       position: absolute; left: 50%; top: 17%; translate: -50% 0; width: min(150px, 36%); aspect-ratio: 9 / 19;
       padding: 5px; border-radius: 24px; background: linear-gradient(160deg, #20262b, #0c0f12);
-      box-shadow: 0 30px 50px -18px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.1), inset 0 1px 0 rgba(255,255,255,.12), 0 0 40px -10px rgba(var(--c), .35);
-      transition: transform .7s var(--ease), box-shadow .5s;
+      /* Tighter shadows: big blur radii were the slowest thing to paint on the whole page */
+      box-shadow: 0 22px 30px -16px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.1), inset 0 1px 0 rgba(255,255,255,.12), 0 0 24px -8px rgba(var(--c), .35);
+      transition: transform .7s var(--ease);
     }
     .mock::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(125deg, rgba(255,255,255,.1), transparent 35%); }
-    .project:hover .mock { transform: translateY(-12px) rotate(-3deg); box-shadow: 0 40px 60px -18px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.12), inset 0 1px 0 rgba(255,255,255,.12), 0 0 60px -6px rgba(var(--c), .5); }
+    /* Hover glow fades in as a pre-painted layer (opacity only), instead of animating box-shadow, which repaints every frame */
+    .mock::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .5s;
+      box-shadow: 0 30px 36px -16px rgba(0,0,0,.6), 0 0 36px -4px rgba(var(--c), .45); }
+    .project:hover .mock { transform: translateY(-12px) rotate(-3deg); }
+    .project:hover .mock::before { opacity: 1; }
     .screen {
       position: relative; height: 100%; overflow: hidden; border-radius: 19px; padding: 20px 10px 10px;
       display: flex; flex-direction: column; gap: 7px; background: linear-gradient(180deg, #161c20, #0d1114);
@@ -1471,7 +1478,7 @@
              linear-gradient(var(--hud-c), var(--hud-c)) left top / 1px 18px no-repeat,
              linear-gradient(var(--hud-c2), var(--hud-c2)) right bottom / 18px 1px no-repeat,
              linear-gradient(var(--hud-c2), var(--hud-c2)) right bottom / 1px 18px no-repeat;
-      --raised: 0 30px 60px -36px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.05), inset 0 0 0 1px rgba(120, 255, 170, .09);
+      --raised: 0 24px 36px -26px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.05), inset 0 0 0 1px rgba(120, 255, 170, .09);
       --raised-sm: 0 12px 28px -18px rgba(0,0,0,.8), inset 0 0 0 1px rgba(120, 255, 170, .09);
       --inset: inset 0 0 0 1px rgba(120, 255, 170, .07);
     }
@@ -1583,7 +1590,7 @@
       --glass-fill-deep: rgba(8, 70, 80, .035);
       --glass-sheen: linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,0) 30%);
       --hud-c: rgba(5, 150, 105, .75); --hud-c2: rgba(5, 150, 105, .6);
-      --raised: 0 24px 48px -32px rgba(10, 50, 32, .35), inset 0 1px 0 #fff, inset 0 0 0 1px rgba(10, 70, 45, .1);
+      --raised: 0 20px 34px -26px rgba(10, 50, 32, .35), inset 0 1px 0 #fff, inset 0 0 0 1px rgba(10, 70, 45, .1);
       --raised-sm: 0 12px 26px -20px rgba(10, 50, 32, .3), inset 0 0 0 1px rgba(10, 70, 45, .1);
       --inset: inset 0 0 0 1px rgba(10, 70, 45, .08);
     }
@@ -1618,7 +1625,7 @@
     @media (max-width: 760px) {
       /* A blur on the header itself would trap the fixed drawer inside the 68px bar, so the glass moves to a pseudo layer */
       header, header.scrolled, [data-theme="light"] header { -webkit-backdrop-filter: none; backdrop-filter: none; }
-      header::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%); }
+      header::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%); }
       html.menu-open, html.menu-open body { overflow: hidden; }
       html.menu-open header { transform: none; }
 
@@ -2697,6 +2704,8 @@
 
       const SCENE = HEAD + `
         uniform vec2 r; uniform float t; uniform vec2 m; uniform float s; uniform float L;   // L: 0 = dark theme, 1 = light
+        uniform vec2 uV; uniform float uE;   // pointer velocity (aspect-corrected uv per frame) and stir energy 0..1
+        uniform vec3 rp[4];                // ripples: xy = where (uv), z = age in seconds (99 = unused)
         float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         float n(vec2 p){
           vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
@@ -2707,14 +2716,44 @@
           for (int i = 0; i < 5; i++) { v += a * n(p); p = p * 2.02 + vec2(1.7, 9.2); a *= .5; }
           return v;
         }
+        // 4 octaves for the warp fields: their finest octave is invisible after warping, and it saves ~15% GPU per pixel
+        float fbm4(vec2 p){
+          float v = 0., a = .5;
+          for (int i = 0; i < 4; i++) { v += a * n(p); p = p * 2.02 + vec2(1.7, 9.2); a *= .5; }
+          return v;
+        }
         void main(){
           vec2 uv = gl_FragCoord.xy / r;
-          vec2 p = uv; p.x *= r.x / r.y;
+          float ar = r.x / r.y;
+          vec2 p = uv; p.x *= ar;
           float T = t * .035;
+
+          // --- The pointer stirs the fluid ---
+          vec2 mp = m; mp.x *= ar;
+          vec2 dm = p - mp;
+          float fall = exp(-dot(dm, dm) * 12.);
+          // a swirl around the pointer, stronger the faster it moves...
+          float ang = fall * uE * 1.7;
+          float cs = cos(ang), sn = sin(ang);
+          p = mp + mat2(cs, -sn, sn, cs) * dm;
+          // ...and the flow is dragged along in the direction of motion
+          p -= uV * fall * 4.;
+          // Click / tap ripples: an expanding ring that bends the flow and catches the light
+          float rg = 0.;
+          for (int i = 0; i < 4; i++) {
+            vec3 R = rp[i];
+            if (R.z > 3.) continue;                      // unused slot
+            vec2 rd = p - vec2(R.x * ar, R.y);
+            float dl = length(rd), front = dl - R.z * .6;
+            float env = exp(-R.z * 1.8);                 // fades out within about a second
+            float band = exp(-front * front * 140.);     // a single soft wavefront
+            p += rd / (dl + .001) * (-front * 12.) * band * env * .07;   // lens-like push at the front, no bullseye
+            rg += band * env;
+          }
           // Domain warping: noise bends noise, which gives the liquid, living motion
-          vec2 q = vec2(fbm(p * 1.3 + T), fbm(p * 1.3 + vec2(5.2, 1.3) - T));
-          vec2 w = vec2(fbm(p * 1.5 + 3. * q + vec2(1.7, 9.2) + T * 1.3 + s),
-                        fbm(p * 1.5 + 3. * q + vec2(8.3, 2.8) - T));
+          vec2 q = vec2(fbm4(p * 1.3 + T), fbm4(p * 1.3 + vec2(5.2, 1.3) - T));
+          vec2 w = vec2(fbm4(p * 1.5 + 3. * q + vec2(1.7, 9.2) + T * 1.3 + s),
+                        fbm4(p * 1.5 + 3. * q + vec2(8.3, 2.8) - T));
           float f = fbm(p * 1.1 + 2.4 * w);
 
           vec3 bg = mix(vec3(.035, .052, .064), vec3(.925, .952, .952), L);
@@ -2732,10 +2771,10 @@
           vec3 lineCol = mix(vec3(.02, .1, .05), vec3(-.05, -.02, -.03), L);
           c += lineCol * .55 * smoothstep(.43, .5, cl) * smoothstep(.3, .8, f);
 
-          // Soft glow that follows the mouse
-          vec2 mp = m; mp.x *= r.x / r.y;
-          float d = length(p - mp);
-          c = mix(c, em, exp(-d * d * 5.) * mix(.2, .3, L));
+          // Soft glow that follows the pointer and brightens while it stirs
+          float d = length(dm);
+          c = mix(c, em, exp(-d * d * 5.) * (mix(.2, .3, L) + uE * .18));
+          c = mix(c, mi, min(rg, 1.) * mix(.32, .3, L));
           gl_FragColor = vec4(c, 1.);
         }`;
 
@@ -2796,13 +2835,12 @@
         return ok;
       }
 
-      // Screen pass at real resolution (crisp glass edges); background pass much lower (it's soft anyway)
-      let dpr = 1;
+      // Screen pass at CSS-pixel resolution (the image is soft, so retina pixels would add cost and no detail);
+      // the fluid itself renders lower still and is scaled up
       function resize() {
-        dpr = isLite() ? 1 : Math.min(devicePixelRatio || 1, 1.5);
-        canvas.width = Math.max(1, Math.round(innerWidth * dpr));
-        canvas.height = Math.max(1, Math.round(innerHeight * dpr));
-        const ss = isLite() ? .25 : (finePointer ? .5 : .35);
+        canvas.width = Math.max(1, Math.round(innerWidth));
+        canvas.height = Math.max(1, Math.round(innerHeight));
+        const ss = isLite() ? .25 : (finePointer ? .42 : .33);
         sw = Math.max(1, Math.round(innerWidth * ss)); sh = Math.max(1, Math.round(innerHeight * ss));
         if (!sceneTex) return;
         gl.bindTexture(gl.TEXTURE_2D, sceneTex);
@@ -2815,7 +2853,25 @@
 
       // --- Motion state ---
       let tx = .5, ty = .6, mx = .5, my = .6, sCur = 0;
-      if (finePointer) addEventListener('pointermove', e => { tx = e.clientX / innerWidth; ty = 1 - e.clientY / innerHeight; }, { passive: true });
+      let vx = 0, vy = 0, energy = 0;                 // how fast the pointer is stirring the fluid
+      const ripples = [];                             // { x, y, born } in uv, newest last
+      const rpData = new Float32Array(12);
+      const setTarget = (x, y) => { tx = x / innerWidth; ty = 1 - y / innerHeight; };
+      const addRipple = (x, y) => {
+        ripples.push({ x: x / innerWidth, y: 1 - y / innerHeight, born: performance.now() });
+        if (ripples.length > 4) ripples.shift();
+      };
+      // Mouse / pen: the fluid follows the cursor, a click sends a ripple
+      addEventListener('pointermove', e => { if (e.pointerType !== 'touch') setTarget(e.clientX, e.clientY); }, { passive: true });
+      addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') addRipple(e.clientX, e.clientY); }, { passive: true });
+      // Touch: a tap ripples, a drag (even while the page scrolls) stirs the fluid under the finger
+      addEventListener('touchstart', e => {
+        const t = e.touches[0]; if (!t) return;
+        setTarget(t.clientX, t.clientY);
+        mx = tx; my = ty;                             // jump there, so the fluid isn't smeared across the screen
+        addRipple(t.clientX, t.clientY);
+      }, { passive: true });
+      addEventListener('touchmove', e => { const t = e.touches[0]; if (t) setTarget(t.clientX, t.clientY); }, { passive: true });
       const SPEED = reduceMotion ? .45 : 1;   // with "reduce motion" it keeps flowing, just calmer
       let clock = 0, lastNow = performance.now(), lastDraw = 0, wasLite = isLite();
       let lCur = isLight() ? 1 : 0, lFrom = lCur, lTo = lCur, lStart = 0;
@@ -2823,12 +2879,31 @@
       function render(now) {
         if (!ready) return;
         if (isLite() !== wasLite) { wasLite = isLite(); resize(); }       // lite only lowers the cost, never stops it
-        if (isLite() && now - lastDraw < 26) return;                     // ~30 fps in lite mode (tolerant of rAF jitter, so it never dips to 20)
+        // Adaptive frame rate: full 60+ fps while something is actually happening (stirring, ripples, scroll parallax,
+        // theme fade); when the fluid is just drifting on its own, ~30 fps looks identical and halves the GPU work,
+        // which also halves how often every frosted-glass panel above it has to re-blur.
+        while (ripples.length && now - ripples[0].born > 3000) ripples.shift();
+        const idle = energy < .015 && !ripples.length && lCur === lTo
+          && Math.abs(scrollY / innerHeight * .25 - sCur) < .002 && Math.abs(tx - mx) + Math.abs(ty - my) < .003;
+        if ((idle || isLite()) && now - lastDraw < 26) return;           // tolerant of rAF jitter, so it never dips to 20
         const dt = Math.max(0, Math.min(now - lastNow, 100));
         lastNow = now; lastDraw = now;
         clock += dt * SPEED;
         const ease = r => 1 - Math.pow(1 - r, dt / 16.67);
-        mx += (tx - mx) * ease(.04); my += (ty - my) * ease(.04);
+        const pmx = mx, pmy = my;
+        mx += (tx - mx) * ease(.09); my += (ty - my) * ease(.09);
+        // Velocity of the eased pointer (per 60 fps frame, aspect-corrected); energy rises with speed and settles when still
+        const f = dt > 0 ? 16.67 / dt : 0, ar = sw / sh;
+        const rvx = (mx - pmx) * f * ar, rvy = (my - pmy) * f;
+        vx += (rvx - vx) * ease(.25); vy += (rvy - vy) * ease(.25);
+        const vl = Math.hypot(vx, vy), vMax = .05;
+        if (vl > vMax) { vx *= vMax / vl; vy *= vMax / vl; }
+        energy += (Math.min(1, vl * 45) * (reduceMotion ? .5 : 1) - energy) * ease(energy < vl * 45 ? .2 : .03);
+        for (let i = 0; i < 4; i++) {
+          const rp = ripples[i];
+          const age = rp ? (now - rp.born) / 1000 : 99;
+          rpData[i * 3] = rp ? rp.x : 0; rpData[i * 3 + 1] = rp ? rp.y : 0; rpData[i * 3 + 2] = age < 3 ? age : 99;
+        }
         sCur += (scrollY / innerHeight * .25 - sCur) * ease(.06);
         const target = isLight() ? 1 : 0;                                // theme: a fixed 0.7 s cross-fade
         if (target !== lTo) { lFrom = lCur; lTo = target; lStart = performance.now(); }
@@ -2841,6 +2916,7 @@
         gl.useProgram(P.scene.p);
         const us = P.scene.u;
         gl.uniform2f(us.r, sw, sh); gl.uniform1f(us.t, clock / 1000); gl.uniform2f(us.m, mx, my);
+        gl.uniform2f(us.uV, vx, vy); gl.uniform1f(us.uE, energy); gl.uniform3fv(us.rp, rpData);
         gl.uniform1f(us.s, sCur); gl.uniform1f(us.L, lCur);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
 
@@ -2874,7 +2950,7 @@
     (() => {
       const canvas = document.getElementById('bg-canvas');
       const ctx = canvas.getContext('2d');
-      const mouse = { x: -9999, y: -9999 };
+      const mouse = { x: -9999, y: -9999, t: 0 };
       const LINK = 130, MOUSE_LINK = 190;
       const DRIFT = reduceMotion ? .4 : 1;   // with reduce motion the stars still drift, just calmer
       let w = 0, h = 0, pts = [], raf = 0;
@@ -3002,10 +3078,15 @@
         if (sat.x < -12 || sat.x > w + 12) { sat = null; nextSat = now + 18000 + Math.random() * 22000; }
       }
 
-      let lastT = 0;
+      let lastT = 0, lastSy = -1;
       function frame(move) {
-        ctx.clearRect(0, 0, w, h);
         const sy = scrollY, now = performance.now();
+        // Adaptive frame rate, like the fluid: full rate while scrolling (stars parallax with the page), while a meteor
+        // or satellite is crossing, or while the mouse is moving; ~30 fps when the stars are only drifting and twinkling
+        const busy = sy !== lastSy || meteors.length || sat || now - mouse.t < 600;
+        if (!busy && lastT && now - lastT < 26) return;
+        lastSy = sy;
+        ctx.clearRect(0, 0, w, h);
         // Motion is scaled by elapsed time (k = 1 at 60 fps): same speed on 60/120/144 Hz, no lurch after a dropped frame
         const k = lastT ? Math.min(Math.max((now - lastT) / 16.67, 0), 3) : 1;
         lastT = now;
@@ -3056,7 +3137,7 @@
       canvas.classList.add('ready');
       addEventListener('resize', resize);
       if (finePointer) {
-        addEventListener('pointermove', e => { if (e.pointerType === 'mouse') { mouse.x = e.clientX; mouse.y = e.clientY; } }, { passive: true });
+        addEventListener('pointermove', e => { if (e.pointerType === 'mouse') { mouse.x = e.clientX; mouse.y = e.clientY; mouse.t = performance.now(); } }, { passive: true });
         document.documentElement.addEventListener('mouseleave', () => { mouse.x = mouse.y = -9999; });
       }
       Frame.add(() => frame(true), 1);   // drawn before the GPU layer picks it up
